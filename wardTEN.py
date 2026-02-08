@@ -8,7 +8,7 @@ st.set_page_config(page_title="Ward 10 Voter Search", layout="wide")
 # 2. Data Loading Function
 @st.cache_data
 def load_data():
-    file_name = "Ward10_Final_Data.xlsx" 
+    file_name = "voters_ward10.xlsx" 
     try:
         df = pd.read_excel(file_name)
         # Clean column names
@@ -98,3 +98,4 @@ else:
     st.info("Enter details above to search.")
     st.write("### Preview of Records")
     st.dataframe(df.head(50), use_container_width=True)
+
