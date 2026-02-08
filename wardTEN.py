@@ -2,77 +2,104 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="Ward 10 Search Engine", layout="wide")
+# 1. Page Configuration
+st.set_page_config(page_title="Ward 10 Voter Search", layout="wide")
 
-# --- DATA LOADING ---
+# 2. Data Loading Function
 @st.cache_data
 def load_data():
+    # Make sure this filename matches your Excel file exactly
+    file_name = "Ward10_Final_Data.xlsx" 
     try:
-        # Assumes voters_data.xlsx is in the SAME GitHub folder as this script
-        df = pd.read_excel("voters_word10.xlsx")
-        # Cleaning column names (removes hidden spaces)
+        df = pd.read_excel(file_name)
+        # Clean column names (remove hidden spaces)
         df.columns = df.columns.str.strip()
-        # Mapping gender for the chart
-        if 'Sex' in df.columns:
-            df['Sex'] = df['Sex'].replace({'M': 'Male', 'F': 'Female'})
+        # Standardize Gender labels for the charts
+        df['Sex'] = df['Sex'].astype(str).str.strip().map({
+            'M': 'Male', 'F': 'Female', 
+            'Male': 'Male', 'Female': 'Female'
+        }).fillna('Unknown')
         return df
     except Exception as e:
-        st.error(f"Error loading Excel file: {e}")
-        return pd.DataFrame()
+        st.error(f"Error: Could not find '{file_name}'. Please ensure it is in the same folder as this script.")
+        st.stop()
 
 df = load_data()
 
-# --- INTERFACE ---
-st.title("🗳️ Ward 10 Search & Analytics")
+# --- SIDEBAR: OVERALL STATISTICS ---
+st.sidebar.header("📊 Ward 10 Summary")
+st.sidebar.metric("Total Registered Voters", len(df))
 
-if df.empty:
-    st.warning("Please ensure 'voters_ward10.xlsx' is uploaded to your GitHub repository.")
-else:
-    # Sidebar Global Stats
-    st.sidebar.header("Global Stats")
-    total_voters = len(df)
-    st.sidebar.metric("Total Voters", total_voters)
-    
-    # Global Pie Chart
-    gen_counts = df['Sex'].value_counts().reset_index()
-    fig_gen = px.pie(gen_counts, values='count', names='Sex', 
-                     title="Overall Gender Split", color='Sex',
-                     color_discrete_map={'Male':'#1f77b4', 'Female':'#e377c2'})
-    st.sidebar.plotly_chart(fig_gen)
+# Overall Gender Pie Chart
+gen_total = df['Sex'].value_counts().reset_index()
+gen_total.columns = ['Gender', 'Count']
+fig_total = px.pie(
+    gen_total, 
+    values='Count', 
+    names='Gender', 
+    title="Ward-wide Gender Split",
+    color='Gender',
+    color_discrete_map={'Male': '#1f77b4', 'Female': '#e377c2'}
+)
+st.sidebar.plotly_chart(fig_total, use_container_width=True)
 
-    # --- SEARCH ENGINE ---
-    search = st.text_input("Enter Name, Door No, or EPIC No to search:")
+# --- MAIN AREA: SEARCH ENGINE ---
+st.title("🗳️ Ward 10 Search Engine")
+st.write("Search for individual voters using their Name, Door Number, or EPIC Number.")
 
-    # --- INSERT THIS NEW BLOCK ---
+# Search Input Box
+search = st.text_input("🔍 Search Voter:", placeholder="Enter Name, Door No, or EPIC No...")
+
 if search:
-    # This checks only the Name, EPIC, and Door No columns. 
-    # It will NOT search the Relation Name column unless you add it here.
+    # TARGETED SEARCH MASK
+    # We only look in Name, Door_No, and EPIC columns. 
+    # 'Relation' column is ignored so father/husband names don't trigger results.
     mask = (
-        df['Name'].str.contains(search, case=False, na=False) | 
-        df['EPIC'].str.contains(search, case=False, na=False) |
-        df['Door No.'].str.contains(search, case=False, na=False)
+        df['Name'].astype(str).str.contains(search, case=False, na=False) | 
+        df['EPIC'].astype(str).str.contains(search, case=False, na=False) |
+        df['Door_No'].astype(str).str.contains(search, case=False, na=False)
     )
     results = df[mask]
-        
-        if not results.empty:
-            col1, col2 = st.columns([2, 1])
+
+    if not results.empty:
+        # Create two columns: Left for the table, Right for the chart
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            st.success(f"Found {len(results)} matches in Voter details.")
+            st.dataframe(results, use_container_width=True)
             
-            with col1:
-                st.success(f"Found {len(results)} matches")
-                st.dataframe(results, use_container_width=True)
-                
-            with col2:
-                # Dynamic Pie Chart for the Search Result
-                st.subheader("Search Analytics")
-                search_gen = results['Sex'].value_counts().reset_index()
-                fig_search = px.pie(search_gen, values='count', names='Sex', 
-                                   title=f"Gender % for '{search}'",
-                                   color='Sex',
-                                   color_discrete_map={'Male':'#1f77b4', 'Female':'#e377c2'})
-                st.plotly_chart(fig_search, use_container_width=True)
-        else:
-            st.error("No records found.")
+            # Optional: Download Button for filtered results
+            csv = results.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Search Results as CSV",
+                data=csv,
+                file_name=f"search_results_{search}.csv",
+                mime="text/csv",
+            )
+
+        with col2:
+            st.write("### 📈 Search Analytics")
+            
+            # Prepare data for the local chart (Fix for Line 57 error)
+            local_gen = results['Sex'].value_counts().reset_index()
+            local_gen.columns = ['Gender', 'Count'] # Explicitly name columns
+            
+            fig_local = px.pie(
+                local_gen, 
+                values='Count', 
+                names='Gender', 
+                title=f"Gender Split for search: '{search}'",
+                hole=0.4,
+                color='Gender',
+                color_discrete_map={'Male': '#1f77b4', 'Female': '#e377c2'}
+            )
+            st.plotly_chart(fig_local, use_container_width=True)
     else:
-        st.info("👆 Enter a search term above to see specific charts.")
-
-
+        st.warning(f"No match found for '{search}' in Voter/EPIC/Door columns.")
+        st.info("💡 Note: This search ignores Father/Husband names to improve accuracy.")
+else:
+    # Default view when no search is performed
+    st.info("Enter details above to see specific charts.")
+    st.write("### Preview of Records")
+    st.dataframe(df.head(50), use_container_width=True)
