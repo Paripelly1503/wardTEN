@@ -43,9 +43,16 @@ else:
     # --- SEARCH ENGINE ---
     search = st.text_input("Enter Name, Door No, or EPIC No to search:")
 
-    if search:
-        # Search across all columns
-        results = df[df.apply(lambda r: search.lower() in r.astype(str).str.lower().values, axis=1)]
+    # --- INSERT THIS NEW BLOCK ---
+if search:
+    # This checks only the Name, EPIC, and Door No columns. 
+    # It will NOT search the Relation Name column unless you add it here.
+    mask = (
+        df['Name'].str.contains(search, case=False, na=False) | 
+        df['EPIC'].str.contains(search, case=False, na=False) |
+        df['Door No.'].str.contains(search, case=False, na=False)
+    )
+    results = df[mask]
         
         if not results.empty:
             col1, col2 = st.columns([2, 1])
@@ -67,4 +74,5 @@ else:
             st.error("No records found.")
     else:
         st.info("👆 Enter a search term above to see specific charts.")
+
 
