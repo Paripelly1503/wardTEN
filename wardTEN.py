@@ -9,7 +9,7 @@ st.set_page_config(page_title="Ward 10 Search Engine", layout="wide")
 def load_data():
     try:
         # Assumes voters_data.xlsx is in the SAME GitHub folder as this script
-        df = pd.read_excel("voters_data.xlsx")
+        df = pd.read_excel("voters_word10.xlsx")
         # Cleaning column names (removes hidden spaces)
         df.columns = df.columns.str.strip()
         # Mapping gender for the chart
@@ -26,7 +26,7 @@ df = load_data()
 st.title("🗳️ Ward 10 Search & Analytics")
 
 if df.empty:
-    st.warning("Please ensure 'voters_data.xlsx' is uploaded to your GitHub repository.")
+    st.warning("Please ensure 'voters_ward10.xlsx' is uploaded to your GitHub repository.")
 else:
     # Sidebar Global Stats
     st.sidebar.header("Global Stats")
@@ -67,3 +67,4 @@ else:
             st.error("No records found.")
     else:
         st.info("👆 Enter a search term above to see specific charts.")
+
